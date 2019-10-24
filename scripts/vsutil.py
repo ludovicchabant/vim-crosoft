@@ -281,7 +281,14 @@ class VSProject:
 
         abspath = self.abspath
         logger.debug(f"Loading project {self.name} ({self.path}) from: {abspath}")
-        tree = etree.parse(abspath)
+        try:
+            tree = etree.parse(abspath)
+        except (FileNotFoundError, OSError) as ex:
+            logger.debug(f"Error loading project {self.name}: " + str(ex))
+            self._itemgroups = {}
+            self._propgroups= {}
+            return
+
         root = tree.getroot()
         if _strip_ns(root.tag) != 'Project':
             raise Exception(f"Expected root node 'Project', got '{root.tag}'")
