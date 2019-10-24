@@ -14,7 +14,7 @@ let g:vimcrosoft_current_config = get(g:, 'vimcrosoft_current_config', '')
 let g:vimcrosoft_current_platform = get(g:, 'vimcrosoft_current_platform', '')
 let g:vimcrosoft_active_project = get(g:, 'vimcrosoft_active_project', '')
 
-let g:vimcrosoft_auto_find_sln = get(g:, 'vimcrosoft_auto_find_sln', 1)
+let g:vimcrosoft_auto_find_sln = get(g:, 'vimcrosoft_auto_find_sln', 0)
 let g:vimcrosoft_sln_finder = get(g:, 'vimcrosoft_sln_finder', '')
 
 let g:vimcrosoft_current_sln_cache = ''
