@@ -29,7 +29,7 @@ let g:vimcrosoft_make_command = get(g:, 'vimcrosoft_make_command', '')
 
 command! VimcrosoftAutoFindSln :call vimcrosoft#auto_find_sln()
 command! -nargs=1 -complete=file VimcrosoftSetSln :call vimcrosoft#set_sln(<f-args>)
-command! VimcrosoftUnsetSln :call Vimcrosoft#set_sln("")
+command! VimcrosoftUnsetSln :call vimcrosoft#set_sln("")
 
 command! -nargs=1 
             \ -complete=customlist,vimcrosoft#complete_current_sln_config_platforms 
