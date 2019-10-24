@@ -28,7 +28,7 @@ ITEM_TYPE_CS_SRC = 'Compile'
 ITEM_TYPE_NONE = 'None'
 
 ITEM_TYPE_SOURCE_FILES = (ITEM_TYPE_CPP_SRC, ITEM_TYPE_CPP_HDR,
-                          ITEM_TYPE_CS_SRC)
+                          ITEM_TYPE_CS_SRC, ITEM_TYPE_NONE)
 
 
 # Known VS properties.
@@ -136,8 +136,12 @@ class VSProjectItemGroup(VSBaseGroup):
         self.items = []
 
     def get_source_items(self):
+        return self.get_items_of_types(ITEM_TYPE_SOURCE_FILES)
+
+    def get_items_of_types(self, *itemtypes):
+        typeset = set(*itemtypes)
         for i in self.items:
-            if i.itemtype in ITEM_TYPE_SOURCE_FILES:
+            if i.itemtype in typeset:
                 yield i
 
     def _collapse_child(self, child, env):
