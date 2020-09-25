@@ -283,6 +283,10 @@ function! vimcrosoft#set_active_project(projname, ...) abort
 endfunction
 
 function! vimcrosoft#build_sln(target) abort
+    if g:vimcrosoft_save_all_on_build
+        wall
+    endif
+
     let l:args = []
     if !empty(a:target)
         call add(l:args, '/t:'.a:target)
@@ -291,6 +295,10 @@ function! vimcrosoft#build_sln(target) abort
 endfunction
 
 function! vimcrosoft#build_project(projname, target, only) abort
+    if g:vimcrosoft_save_all_on_build
+        wall
+    endif
+
     let l:projname = !empty(a:projname) ? a:projname : g:vimcrosoft_active_project
     if empty(l:projname)
         call vimcrosoft#error("No project name given, and no active project set.")

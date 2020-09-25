@@ -23,6 +23,8 @@ let g:vimcrosoft_msbuild_path = get(g:, 'vimcrosoft_msbuild_path', '')
 let g:vimcrosoft_use_external_python = get(g:, 'vimcrosoft_use_external_python', 0)
 let g:vimcrosoft_make_command = get(g:, 'vimcrosoft_make_command', '')
 
+let g:vimcrosoft_save_all_on_build = get(g:, 'vimcrosoft_save_all_on_build', 1)
+
 " }}}
 
 " Commands {{{
