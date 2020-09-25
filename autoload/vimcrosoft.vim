@@ -346,7 +346,7 @@ function! vimcrosoft#run_make(customargs) abort
 endfunction
 
 function! vimcrosoft#set_config_platform(configplatform)
-    let l:bits = split(a:configplatform, '|')
+    let l:bits = split(substitute(a:configplatform, '\\ ', ' ', 'g'), '|')
     if len(l:bits) != 2
         call vimcrosoft#throw("Expected a value of the form: Config|Platform")
     endif
@@ -393,11 +393,11 @@ function! vimcrosoft#complete_current_sln_projects(ArgLead, CmdLine, CursorPos)
 endfunction
 
 function! vimcrosoft#complete_current_sln_config_platforms(ArgLead, CmdLine, CursorPos)
-    let l:cfgplats = vimcrosoft#get_sln_config_platforms()
     let l:argpat = '^'.substitute(a:ArgLead, '\', '', 'g')
-    let l:cfgplatnames = filter(l:cfgplats,
-                \{idx, val -> val =~? l:argpat})
-    return l:cfgplatnames
+    let l:cfgplats = vimcrosoft#get_sln_config_platforms()
+    let l:cfgplats_filtered = filter(l:cfgplats, {idx, val -> val =~? l:argpat})
+    call map(l:cfgplats_filtered, {idx, val -> escape(val, ' ')})
+    return l:cfgplats_filtered
 endfunction
 
 " }}}
