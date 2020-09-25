@@ -30,7 +30,6 @@ ITEM_TYPE_NONE = 'None'
 ITEM_TYPE_SOURCE_FILES = (ITEM_TYPE_CPP_SRC, ITEM_TYPE_CPP_HDR,
                           ITEM_TYPE_CS_SRC, ITEM_TYPE_NONE)
 
-
 # Known VS properties.
 PROP_CONFIGURATION_TYPE = 'ConfigurationType'
 PROP_NMAKE_PREPROCESSOR_DEFINITIONS = 'NMakePreprocessorDefinitions'
@@ -95,7 +94,7 @@ class VSBaseGroup:
             self.conditionals[condition] = c
         return c
 
-    def resolve(self, env):
+    def _resolve(self, env):
         """ Resolves this group by evaluating each conditional sub-group
             based on the given build environment. Returns a 'flattened'
             version of ourselves.
@@ -117,8 +116,8 @@ class VSProjectItem:
         self.itemtype = itemtype
         self.metadata = {}
 
-    def resolve(self, env):
-        c = VSProjectItem(_resolve_value(self.include), self.itemtype)
+    def _resolve(self, env):
+        c = VSProjectItem(_resolve_value(self.include, env), self.itemtype)
         c.metadata = {k: _resolve_value(v, env)
                       for k, v in self.metadata.items()}
         return c
@@ -138,14 +137,19 @@ class VSProjectItemGroup(VSBaseGroup):
     def get_source_items(self):
         return self.get_items_of_types(ITEM_TYPE_SOURCE_FILES)
 
-    def get_items_of_types(self, *itemtypes):
-        typeset = set(*itemtypes)
+    def get_items_of_type(self, itemtype):
+        for i in self.items:
+            if i.itemtype == itemtype:
+                yield i
+
+    def get_items_of_types(self, itemtypes):
+        typeset = set(itemtypes)
         for i in self.items:
             if i.itemtype in typeset:
                 yield i
 
     def _collapse_child(self, child, env):
-        self.items += [i.resolve(env) for i in child.items]
+        self.items += [i._resolve(env) for i in child.items]
 
 
 class VSProjectProperty:
@@ -154,7 +158,7 @@ class VSProjectProperty:
         self.name = name
         self.value = value
 
-    def resolve(self, env):
+    def _resolve(self, env):
         c = VSProjectProperty(self.name, _resolve_value(self.value, env))
         return c
 
@@ -181,12 +185,13 @@ class VSProjectPropertyGroup(VSBaseGroup):
         raise IndexError()
 
     def _collapse_child(self, child, env):
-        self.properties += [p.resolve(env) for p in child.properties]
+        self.properties += [p._resolve(env) for p in child.properties]
 
 
 class VSProject:
     """ A VS project. """
-    def __init__(self, projtype, name, path, guid):
+    def __init__(self, owner, projtype, name, path, guid):
+        self.owner = owner
         self.type = projtype
         self.name = name
         self.path = path
@@ -228,7 +233,8 @@ class VSProject:
         ig = self._itemgroups.get(label)
         if resolved_with is not None and ig is not None:
             logger.debug("Resolving item group '%s'." % ig.label)
-            ig = ig.resolve(resolved_with)
+            self._validate_build_env(resolved_with)
+            ig = ig._resolve(resolved_with)
         return ig
 
     def defaultitemgroup(self, resolved_with=None):
@@ -239,7 +245,8 @@ class VSProject:
         pg = self._propgroups.get(label)
         if resolved_with is not None and pg is not None:
             logger.debug("Resolving property group '%s'." % pg.label)
-            pg = pg.resolve(resolved_with)
+            self._validate_build_env(resolved_with)
+            pg = pg._resolve(resolved_with)
         return pg
 
     def defaultpropertygroup(self, resolved_with=None):
@@ -251,18 +258,24 @@ class VSProject:
     def resolve(self, env):
         self._ensure_loaded()
 
+        self._validate_build_env(env)
+
         propgroups = list(self._propgroups)
         itemgroups = list(self._itemgroups)
         self._propgroups[:] = []
         self._itemgroups[:] = []
 
         for pg in propgroups:
-            rpg = pg.resolve(env)
+            rpg = pg._resolve(env)
             self._propgroups.append(rpg)
 
         for ig in itemgroups:
-            rig = ig.resolve(env)
+            rig = ig._resolve(env)
             self._itemgroups.append(rig)
+
+    def _validate_build_env(self, buildenv):
+        buildenv['SolutionDir'] = self.owner.dirpath + os.path.sep
+        buildenv['ProjectDir'] = self.absdirpath + os.path.sep
 
     def _ensure_loaded(self):
         if self._itemgroups is None or self._propgroups is None:
@@ -483,6 +496,7 @@ def _parse_sln_file_text(slnobj, lines):
             # Found the start of a project declaration.
             try:
                 p = VSProject(
+                    slnobj,
                     m.group('type'), m.group('name'), m.group('path'),
                     m.group('guid'))
             except:
@@ -509,11 +523,12 @@ class SolutionCache:
     """ A class that contains a VS solution object, along with pre-indexed
         lists of items. It's meant to be saved on disk.
     """
-    VERSION = 3
+    VERSION = 4
 
     def __init__(self, slnobj):
         self.slnobj = slnobj
         self.index = None
+        self._saved_version = SolutionCache.VERSION
 
     def build_cache(self):
         self.index = {}
@@ -577,10 +592,12 @@ def _try_load_from_cache(slnpath, cachepath):
         cache = pickle.load(fp)
 
     # Check that the cache version is up-to-date with this code.
-    loaded_ver = getattr(cache, 'VERSION')
+    loaded_ver = getattr(cache, '_saved_version', 0)
     if loaded_ver != SolutionCache.VERSION:
-        logger.debug(f"Cache was saved with older format: {cachepath}")
+        logger.debug(f"Cache was saved with older format: {cachepath} "
+                     f"(got {loaded_ver}, expected {SolutionCache.VERSION})")
         return None
+    logger.debug(f"Cache has correct version: {loaded_ver}")
 
     slnobj = cache.slnobj
 
