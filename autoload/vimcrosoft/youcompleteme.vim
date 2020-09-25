@@ -1,4 +1,6 @@
 
+let g:vimcrosoft_extra_clang_args = get(g:, 'vimcrosoft_extra_clang_args', [])
+
 function! vimcrosoft#youcompleteme#init() abort
 endfunction
 
@@ -8,7 +10,8 @@ function! vimcrosoft#youcompleteme#on_sln_changed(slnpath) abort
                 \'g:vimcrosoft_current_sln',
                 \'g:vimcrosoft_current_sln_cache',
                 \'g:vimcrosoft_current_config',
-                \'g:vimcrosoft_current_platform'
+                \'g:vimcrosoft_current_platform',
+				\'g:vimcrosoft_extra_clang_args'
                 \]
 endfunction
 
