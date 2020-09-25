@@ -31,9 +31,13 @@ def main(args=None):
 
     cache, loaded = SolutionCache.load_or_rebuild(args.solution, args.cache)
     if loaded and args.list_cache:
-        cache_dt = os.path.getmtime(args.cache)
-        list_cache_dt = os.path.getmtime(args.list_cache)
-        if list_cache_dt > cache_dt:
+        caches_exist = True
+        try:
+            cache_dt = os.path.getmtime(args.cache)
+            list_cache_dt = os.path.getmtime(args.list_cache)
+        except OSError:
+            caches_exist = False
+        if caches_exist and list_cache_dt > cache_dt:
             logger.debug("Solution cache was valid, re-using the file list cache.")
             try:
                 with open(args.list_cache, 'r') as fp:
