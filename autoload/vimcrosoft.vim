@@ -62,6 +62,13 @@ function! vimcrosoft#ensure_msbuild_found() abort
     return 0
 endfunction
 
+function! vimcrosoft#get_msbuild_errorformat() abort
+    " MSBuild error formats look like this:
+    " Path\To\Source\Filename.cpp|53| error C2065: 'MyClass': undeclared identifier [Path\To\MyProject.vcxproj]
+    return '%*[^\ ]\ %f\|%l\|\ %trror\ \D%n:\ %m\ [%o]'
+                " \'\|\|\ %f\|%l\|\ %tarning\ \D%n:\ %m\ [%o]'
+endfunction
+
 " }}}
 
 " Cache Files {{{

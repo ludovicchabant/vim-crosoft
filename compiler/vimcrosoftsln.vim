@@ -22,6 +22,9 @@ call vimcrosoft#trace("Setting makeprg to: ".s:prgcmdline)
 execute "CompilerSet makeprg=".s:prgcmdline
 
 CompilerSet errorformat&
+"execute "CompilerSet errorformat=".vimcrosoft#get_msbuild_errorformat()
+"echom "Set errorformat!"
+"echom &errorformat
 
 let &cpo = s:keepcpo
 unlet s:keepcpo

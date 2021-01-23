@@ -54,18 +54,40 @@ def _find_any_possible_item_specific_flags(
         incfiles += item_incfiles
         return True
 
-    logger.debug("Requested item didn't have any flags, looking for companion item")
+    logger.debug("Requested item didn't have any flags, looking for related items")
     from find_companion import _find_companion_item
     companion_item = _find_companion_item(solution, filename, slncache=slncache)
     if companion_item:
-        logger.debug("Found companion item: %s" % companion_item)
         item_incpaths, item_incfiles = _get_item_specific_flags(projdir, clcompileitems, companion_item)
-        incpaths += item_incpaths
-        incfiles += item_incfiles
-        return True
+        if item_incpaths or item_incfiles:
+            logger.debug("Found flags on companion item: %s" % companion_item)
+            incpaths += item_incpaths
+            incfiles += item_incfiles
+            return True
 
     #logger.debug("No companion item found, see if we can find flags for a neighbour")
-    #os.path.dirname(filename)
+    #dirname = os.path.dirname(filename)
+    #neighbournames = os.listdir(dirname)
+    #neighbournames.remove(os.path.basename(filename))
+    #for neighbourname in neighbournames:
+    #    neighbourpath = os.path.join(dirname, neighbourname)
+    #    item_incpaths, item_incfiles = _get_item_specific_flags(projdir, clcompileitems, neighbourpath)
+    #    if item_incpaths or item_incfiles:
+    #        logger.debug("Found flags on: %d" % neighbourpath)
+    #        incpaths += item_incpaths
+    #        incfiles += item_incfiles
+    #        return True
+
+    #    neighbour_companion = _find_companion_item(solution, filename, slncache=slncache)
+    #    if neighbour_companion:
+    #        item_incpaths, item_incfiles = _get_item_specific_flags(projdir, clcompileitems, neighbour_companion)
+    #        if item_incpaths or item_incfiles:
+    #            logger.debug("Found flags on: %s" % neighbour_companion)
+    #            incpaths += item_incpaths
+    #            incfiles += item_incfiles
+    #            return True
+
+    #logger.debug("No flags found anywhere...")
     return False
 
 
