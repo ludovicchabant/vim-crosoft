@@ -267,6 +267,12 @@ function! vimcrosoft#default_sln_finder(path) abort
         let l:slnfiles = globpath(l:cur, '*.sln', 0, 1)
         if !empty(l:slnfiles)
             call vimcrosoft#trace("Found solution file: ".l:slnfiles[0])
+            if len(l:slnfiles) > 1 && g:vimcrosoft_warn_multiple_slns
+                let l:warnmsg = "Found multiple solutions files: "
+                            \.join(l:slnfiles, " ; ")
+                            \."  Check or change the auto-chosen first one."
+                call vimcrosoft#warning(l:warnmsg)
+            endif
             return l:slnfiles[0]
         endif
         let l:prev = l:cur
