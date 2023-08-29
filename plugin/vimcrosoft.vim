@@ -3,7 +3,12 @@
 
 " Globals {{{
 
-if (&cp || get(g:, 'vimcrosoft_dont_load', 0))
+if exists('g:loaded_vimcrosoft') || &cp
+  finish
+endif
+let g:loaded_vimcrosoft = 1
+
+if get(g:, 'vimcrosoft_dont_load', 0)
     finish
 endif
 
@@ -75,3 +80,4 @@ command! -nargs=1 -complete=customlist,vimcrosoft#complete_current_sln_projects
 call vimcrosoft#init()
 
 " }}}
+
