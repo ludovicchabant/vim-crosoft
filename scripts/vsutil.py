@@ -199,6 +199,7 @@ class VSProject:
         self._itemgroups = None
         self._propgroups = None
         self._sln = None
+        self._missing = False
 
     @property
     def is_folder(self):
@@ -300,49 +301,62 @@ class VSProject:
             logger.debug(f"Error loading project {self.name}: " + str(ex))
             self._itemgroups = {}
             self._propgroups= {}
+            self._missing = True
             return
 
         root = tree.getroot()
         if _strip_ns(root.tag) != 'Project':
             raise Exception(f"Expected root node 'Project', got '{root.tag}'")
 
+        # Load ItemGroups and PropertyGroups via both namespaced names and raw
+        # names because not all types of VS projects use the MS namespaces.
         self._itemgroups = {}
+        for itemgroupnode in root.iterfind('ItemGroup', ns):
+            self._load_item_group(itemgroupnode)
         for itemgroupnode in root.iterfind('ms:ItemGroup', ns):
-            label = itemgroupnode.attrib.get('Label')
-            itemgroup = self._itemgroups.get(label)
-            if not itemgroup:
-                itemgroup = VSProjectItemGroup(label)
-                self._itemgroups[label] = itemgroup
-                logger.debug(f"Adding itemgroup '{label}'")
-
-            condition = itemgroupnode.attrib.get('Condition')
-            if condition:
-                itemgroup = itemgroup.get_or_create_conditional(condition)
-
-            for itemnode in itemgroupnode:
-                incval = itemnode.attrib.get('Include')
-                item = VSProjectItem(incval, _strip_ns(itemnode.tag))
-                itemgroup.items.append(item)
-                for metanode in itemnode:
-                    item.metadata[_strip_ns(metanode.tag)] = metanode.text
+            self._load_item_group(itemgroupnode)
 
         self._propgroups = {}
+        for propgroupnode in root.iterfind('PropertyGroup', ns):
+            self._load_property_group(propgroupnode)
         for propgroupnode in root.iterfind('ms:PropertyGroup', ns):
-            label = propgroupnode.attrib.get('Label')
-            propgroup = self._propgroups.get(label)
-            if not propgroup:
-                propgroup = VSProjectPropertyGroup(label)
-                self._propgroups[label] = propgroup
-                logger.debug(f"Adding propertygroup '{label}'")
+            self._load_property_group(propgroupnode)
 
-            condition = propgroupnode.attrib.get('Condition')
-            if condition:
-                propgroup = propgroup.get_or_create_conditional(condition)
+    def _load_item_group(self, itemgroupnode):
+        label = itemgroupnode.attrib.get('Label')
+        itemgroup = self._itemgroups.get(label)
+        if not itemgroup:
+            itemgroup = VSProjectItemGroup(label)
+            self._itemgroups[label] = itemgroup
+            logger.debug(f"Adding itemgroup '{label}'")
 
-            for propnode in propgroupnode:
-                propgroup.properties.append(VSProjectProperty(
-                    _strip_ns(propnode.tag),
-                    propnode.text))
+        condition = itemgroupnode.attrib.get('Condition')
+        if condition:
+            itemgroup = itemgroup.get_or_create_conditional(condition)
+
+        for itemnode in itemgroupnode:
+            incval = itemnode.attrib.get('Include')
+            item = VSProjectItem(incval, _strip_ns(itemnode.tag))
+            itemgroup.items.append(item)
+            for metanode in itemnode:
+                item.metadata[_strip_ns(metanode.tag)] = metanode.text
+
+    def _load_property_group(self, propgroupnode):
+        label = propgroupnode.attrib.get('Label')
+        propgroup = self._propgroups.get(label)
+        if not propgroup:
+            propgroup = VSProjectPropertyGroup(label)
+            self._propgroups[label] = propgroup
+            logger.debug(f"Adding propertygroup '{label}'")
+
+        condition = propgroupnode.attrib.get('Condition')
+        if condition:
+            propgroup = propgroup.get_or_create_conditional(condition)
+
+        for propnode in propgroupnode:
+            propgroup.properties.append(VSProjectProperty(
+                _strip_ns(propnode.tag),
+                propnode.text))
 
 
 class MissingVSProjectError(Exception):
@@ -476,7 +490,7 @@ def _parse_sln_file_text(slnobj, lines):
             if m:
                 # Found the start of a new section.
                 in_global_section = VSGlobalSection(m.group('name'))
-                logging.debug(f"   Adding global section {in_global_section.name}")
+                logging.debug(f"   Adding global section {in_global_section.name} (line {i})")
                 slnobj.sections.append(in_global_section)
                 continue
 
@@ -501,7 +515,7 @@ def _parse_sln_file_text(slnobj, lines):
                     m.group('guid'))
             except:
                 raise Exception(f"Error line {i}: unexpected project syntax.")
-            logging.debug(f"  Adding project {p.name}")
+            logging.debug(f"  Adding project {p.name} (line {i})")
             slnobj.projects.append(p)
             p._sln = slnobj
 
@@ -523,7 +537,7 @@ class SolutionCache:
     """ A class that contains a VS solution object, along with pre-indexed
         lists of items. It's meant to be saved on disk.
     """
-    VERSION = 4
+    VERSION = 5
 
     def __init__(self, slnobj):
         self.slnobj = slnobj
@@ -543,8 +557,12 @@ class SolutionCache:
             self.index[proj.abspath] = item_cache
 
             for item in itemgroup.get_source_items():
-                item_path = proj.get_abs_item_include(item).lower()
-                item_cache.add(item_path)
+                if item.include:
+                    item_path = proj.get_abs_item_include(item).lower()
+                    item_cache.add(item_path)
+                # else: it's an item from our shortlist (cpp, cs, etc files)
+                # but it somehow doesn't have a path, which can happen with
+                # some obscure VS features.
 
     def save(self, path):
         pathdir = os.path.dirname(path)
@@ -554,8 +572,8 @@ class SolutionCache:
             pickle.dump(self, fp)
 
     @staticmethod
-    def load_or_rebuild(slnpath, cachepath):
-        if cachepath:
+    def load_or_rebuild(slnpath, cachepath, force_rebuild=False):
+        if cachepath and not force_rebuild:
             res = _try_load_from_cache(slnpath, cachepath)
             if res is not None:
                 return res
@@ -588,8 +606,14 @@ def _try_load_from_cache(slnpath, cachepath):
     # projects might be out of date, but at least there can't be any
     # added or removed projects from the solution (otherwise the solution
     # file would have been touched). Let's load the cache.
-    with open(cachepath, 'rb') as fp:
-        cache = pickle.load(fp)
+    try:
+        with open(cachepath, 'rb') as fp:
+            cache = pickle.load(fp)
+    except Exception as ex:
+        logger.debug("Error loading solution cache: %s" % ex)
+        logger.debug("Deleting cache: %s" % cachepath)
+        os.remove(cachepath)
+        return None
 
     # Check that the cache version is up-to-date with this code.
     loaded_ver = getattr(cache, '_saved_version', 0)
@@ -608,9 +632,16 @@ def _try_load_from_cache(slnpath, cachepath):
         if not p.is_folder:
             try:
                 proj_dts.append(os.path.getmtime(p.abspath))
+                # The project was missing last time we built the cache,
+                # but now it exists. Force a rebuild.
+                if p._missing:
+                    return None
             except OSError:
-                logger.debug(f"Found missing project: {p.abspath}")
-                return None
+                if not p._missing:
+                    logger.debug(f"Found missing project: {p.abspath}")
+                    return None
+                # else: it was already missing last time we built the
+                # cache, so nothing has changed.
 
     if all([cache_dt > pdt for pdt in proj_dts]):
         logger.debug(f"Cache is up to date: {cachepath}")

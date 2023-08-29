@@ -14,6 +14,9 @@ def main(args=None):
                         help="The path to the Visual Studio solution file.")
     parser.add_argument('-c', '--cache',
                         help="The solution cache file to load.")
+    parser.add_argument('--rebuild-cache',
+                        action='store_true',
+                        help="Force rebuild the cache even if it is valid")
     parser.add_argument('--list-cache',
                         help=("If the solution cache is valid, use this "
                               "pre-saved file list. Otherwise, compute the "
@@ -29,7 +32,8 @@ def main(args=None):
     args = parser.parse_args(args)
     setup_logging(args.verbose)
 
-    cache, loaded = SolutionCache.load_or_rebuild(args.solution, args.cache)
+    cache, loaded = SolutionCache.load_or_rebuild(args.solution, args.cache,
+                                                  args.rebuild_cache)
     if loaded and args.list_cache:
         caches_exist = True
         try:
@@ -61,10 +65,13 @@ def main(args=None):
 
     for p in projs:
         ig = p.defaultitemgroup()
+        if ig is None:
+            continue
         for i in ig.get_items_of_types(itemtypes):
-            file_path = os.path.abspath(os.path.join(p.absdirpath, i.include))
-            print(file_path)
-            items.append(file_path + '\n')
+            if i.include:
+                file_path = os.path.abspath(os.path.join(p.absdirpath, i.include))
+                print(file_path)
+                items.append(file_path + '\n')
 
     if args.list_cache:
         logger.debug("Writing file list cache: %s" % args.list_cache)
