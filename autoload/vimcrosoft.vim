@@ -395,6 +395,38 @@ endfunction
 
 " }}}
 
+" {{{ Buffer Management
+
+function! vimcrosoft#delete_all_other_buffers()
+    let l:cur_buf_nr = bufnr()
+    if l:cur_buf_nr > 1
+        execute "1,".(l:cur_buf_nr - 1)."bdelete"
+    endif
+    let l:last_buf_nr = bufnr('$')
+    if l:cur_buf_nr < l:last_buf_nr
+        execute (l:cur_buf_nr + 1).",$bdelete"
+    endif
+endfunction
+
+function! vimcrosoft#delete_all_outside_buffers(outside_dir)
+    let l:rel_outside_dir = fnamemodify(a:outside_dir, ':.')
+    let l:match_len = len(l:rel_outside_dir)
+
+    let l:last_buf_nr = bufnr('$')
+    for bufidx in range(1, l:last_buf_nr)
+        if buflisted(bufidx)
+            let l:cur_buf_name = bufname(bufidx)
+            if len(l:cur_buf_name) <= l:match_len ||
+                        \ l:cur_buf_name[0:l:match_len - 1] !=? l:rel_outside_dir
+                call vimcrosoft#trace("Deleting buffer [".string(bufidx)."] ".l:cur_buf_name)
+                execute "bdelete ".string(bufidx)
+            endif
+        endif
+    endfor
+endfunction
+
+" }}}
+
 " {{{ Commands Auto-completion
 
 function! vimcrosoft#complete_current_sln_projects(ArgLead, CmdLine, CursorPos)

@@ -4,7 +4,7 @@
 " Globals {{{
 
 if exists('g:loaded_vimcrosoft') || &cp
-  finish
+    finish
 endif
 let g:loaded_vimcrosoft = 1
 
@@ -72,6 +72,14 @@ command! -nargs=1
 command! -nargs=1 -complete=customlist,vimcrosoft#complete_current_sln_projects 
             \ VimcrosoftCleanProject 
             \ :call vimcrosoft#build_project(<f-args>, 'Clean', 1)
+
+command!
+            \ VimcrosoftDeleteAllOtherBuffers
+            \ :call vimcrosoft#delete_all_other_buffers()
+command! -nargs=1
+            \ -complete=dir
+            \ VimcrosoftDeleteAllOutsideBuffers
+            \ :call vimcrosoft#delete_all_outside_buffers(<f-args>)
 
 " }}}
 
