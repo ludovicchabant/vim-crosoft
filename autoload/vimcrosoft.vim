@@ -295,6 +295,13 @@ function! vimcrosoft#set_active_project(projname, ...) abort
     endif
 endfunction
 
+function! vimcrosoft#invalidate_sln_cache() abort
+    if g:vimcrosoft_current_sln_cache
+        echom "Deleting cache: " . g:vimcrosoft_current_sln_cache
+        call delete(g:vimcrosoft_current_sln_cache)
+    endif
+endfunction
+
 function! vimcrosoft#build_sln(target) abort
     if g:vimcrosoft_save_all_on_build
         wall
