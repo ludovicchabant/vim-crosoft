@@ -1,3 +1,5 @@
+__pycache__
+doc/tags
 scripts/clang_ycm_args.rsp
 scripts/clang_ycm_invoke.cmd
 scripts/clang_ycm_invoke.log
