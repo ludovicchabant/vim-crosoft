@@ -10,6 +10,9 @@ def main():
                         help="The path to the solution file")
     parser.add_argument('cache',
                         help="The path to the cache file")
+    parser.add_argument('-f', '--force',
+                        action='store_true',
+                        help="Force rebuilding the cache file")
     parser.add_argument('-v', '--verbose',
                         action='store_true')
     args = parser.parse_args()
@@ -20,7 +23,8 @@ def main():
     logging.basicConfig(level=loglevel)
     logger = logging.getLogger()
 
-    cache, loaded = SolutionCache.load_or_rebuild(args.solution, args.cache)
+    cache, loaded = SolutionCache.load_or_rebuild(args.solution, args.cache,
+                                                  force_rebuild=args.force)
     if not loaded:
         total_items = sum([len(i) for i in cache.index.values()])
         logger.debug(f"Built cache with {total_items} items.")
