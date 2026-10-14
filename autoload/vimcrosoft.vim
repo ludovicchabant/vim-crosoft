@@ -85,6 +85,14 @@ function! vimcrosoft#get_sln_cache_dir(...) abort
     return l:cache_dir
 endfunction
 
+function! vimcrosoft#ensure_sln_cache_dir() abort
+    let l:cache_dir = vimcrosoft#get_sln_cache_dir()
+    if !isdirectory(l:cache_dir)
+        call vimcrosoft#trace("Creating cache directory: ".l:cache_dir)
+        call mkdir(l:cache_dir)
+    endif
+endfunction
+
 function! vimcrosoft#get_sln_cache_file(filename) abort
     let l:cache_dir = vimcrosoft#get_sln_cache_dir()
     if empty(l:cache_dir)
@@ -105,6 +113,8 @@ function! vimcrosoft#save_config() abort
         return
     endif
 
+    call vimcrosoft#ensure_sln_cache_dir()
+
     call vimcrosoft#trace("Saving config for: ".g:vimcrosoft_current_sln)
     let l:lines = [
                 \'format='.string(s:config_format),
@@ -118,26 +128,31 @@ endfunction
 
 function! vimcrosoft#load_config() abort
     if empty(g:vimcrosoft_current_sln)
-        return
+        call vimcrosoft#trace("No config file since no solution set")
+        return v:false
     endif
 
     let l:configfile = vimcrosoft#get_sln_cache_file('config.txt')
     if !filereadable(l:configfile)
-        return
+        call vimcrosoft#trace("Config file not readable: ".l:configfile)
+        return v:false
     endif
 
     let l:lines = readfile(l:configfile)
     let l:format_line = l:lines[0]
     if l:format_line == 'format='.string(s:config_format)
+        call vimcrosoft#trace("Loaded config file: ".l:configfile)
         let g:vimcrosoft_current_sln = l:lines[1]
         let g:vimcrosoft_current_config = l:lines[2]
         let g:vimcrosoft_current_platform = l:lines[3]
         let g:vimcrosoft_active_project = l:lines[4]
+        return v:true
     else
         call vimcrosoft#warning("Solution configuration format has changed ".
                     \"since you last opened this solution in Vim. ".
                     \"You previous configuration/platform has NOT been ".
                     \"restored.")
+        return v:false
     endif
 endfunction
 
@@ -219,7 +234,7 @@ endfunction
 " Solution Management {{{
 
 function! vimcrosoft#set_sln(slnpath, ...) abort
-    let g:vimcrosoft_current_sln = a:slnpath
+    let g:vimcrosoft_current_sln = fnamemodify(a:slnpath, ":p")
 
     let l:sln_was_set = !empty(a:slnpath)
     if l:sln_was_set
@@ -245,12 +260,35 @@ endfunction
 function! vimcrosoft#auto_find_sln(...) abort
     let l:path = getcwd()
     try
-        let l:slnpath = vimcrosoft#find_sln(l:path)
+        let l:slnpaths = vimcrosoft#find_sln(l:path)
     catch /^vimcrosoft:/
-        let l:slnpath = ''
+        let l:slnpaths = []
     endtry
     let l:silent = a:0 && a:1
-    call vimcrosoft#set_sln(l:slnpath, l:silent)
+    if type(l:slnpaths) == type("")
+        call vimcrosoft#set_sln(l:slnpaths, l:silent)
+    elseif type(l:slnpaths) == type([])
+        if len(l:slnpaths) == 1
+            call vimcrosoft#set_sln(l:slnpaths[0], l:silent)
+        else
+            call vimcrosoft#trace("Found multiple solutions files: ".string(l:slnpaths))
+            " Set the current solution to the first found file just for the
+            " cache file stuff to work as expected. The call to load_config()
+            " will then set the last used solution file. If not, it returns
+            " false.
+            let g:vimcrosoft_current_sln = l:slnpaths[0]
+            if !vimcrosoft#load_config()
+                let l:warnmsg = "Found multiple solutions files: "
+                            \.join(l:slnpaths, " ; ")
+                            \."  Check or change the auto-chosen first one."
+                call vimcrosoft#warning(l:warnmsg)
+            endif
+            " Still need to call set_sln() to notify the modules and so on.
+            call vimcrosoft#set_sln(g:vimcrosoft_current_sln)
+        endif
+    else
+        call vimcrosoft#throw("Invalid solution files found: ".string(l:slnpaths))
+    endif
 endfunction
 
 function! vimcrosoft#find_sln(curpath) abort
@@ -266,14 +304,8 @@ function! vimcrosoft#default_sln_finder(path) abort
     while l:cur != l:prev
         let l:slnfiles = globpath(l:cur, '*.sln', 0, 1)
         if !empty(l:slnfiles)
-            call vimcrosoft#trace("Found solution file: ".l:slnfiles[0])
-            if len(l:slnfiles) > 1 && g:vimcrosoft_warn_multiple_slns
-                let l:warnmsg = "Found multiple solutions files: "
-                            \.join(l:slnfiles, " ; ")
-                            \."  Check or change the auto-chosen first one."
-                call vimcrosoft#warning(l:warnmsg)
-            endif
-            return l:slnfiles[0]
+            call vimcrosoft#trace("Found solution files: ".string(l:slnfiles))
+            return l:slnfiles
         endif
         let l:prev = l:cur
         let l:cur = fnamemodify(l:cur, ':h')
