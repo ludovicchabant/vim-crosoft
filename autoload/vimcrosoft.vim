@@ -270,7 +270,7 @@ function! vimcrosoft#auto_find_sln(...) abort
     elseif type(l:slnpaths) == type([])
         if len(l:slnpaths) == 1
             call vimcrosoft#set_sln(l:slnpaths[0], l:silent)
-        else
+        elseif len(l:slnpaths) > 1
             call vimcrosoft#trace("Found multiple solutions files: ".string(l:slnpaths))
             " Set the current solution to the first found file just for the
             " cache file stuff to work as expected. The call to load_config()
@@ -284,7 +284,7 @@ function! vimcrosoft#auto_find_sln(...) abort
                 call vimcrosoft#warning(l:warnmsg)
             endif
             " Still need to call set_sln() to notify the modules and so on.
-            call vimcrosoft#set_sln(g:vimcrosoft_current_sln)
+            call vimcrosoft#set_sln(g:vimcrosoft_current_sln, l:silent)
         endif
     else
         call vimcrosoft#throw("Invalid solution files found: ".string(l:slnpaths))
